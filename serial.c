@@ -178,7 +178,8 @@ int main(){
 	fprintf(fout, "%f\n", computation_time);
 	fclose(fout);
 
-    // draw_chart_gnu();
+
+    draw_chart_gnu(cluster_filename);
 
     return 0;
 }
@@ -240,7 +241,7 @@ void kmeans_sequential_execution()
         //Compute centroid from cluster_points_sum and store inside iter_centroids_global in a iteration
         for (i = 0; i < K_global; i++)
         {
-            assert(points_inside_cluster_count[i] != 0);
+            // assert(points_inside_cluster_count[i] != 0);
             iter_centroids_global[((iter_counter + 1) * K_global + i) * 2] = cluster_points_sum[i * 2] / points_inside_cluster_count[i];
             iter_centroids_global[((iter_counter + 1) * K_global + i) * 2 + 1] = cluster_points_sum[i * 2 + 1] / points_inside_cluster_count[i];
             // iter_centroids_global[((iter_counter + 1) * K_global + i) * 3 + 2] = cluster_points_sum[i * 3 + 2] / points_inside_cluster_count[i];
@@ -333,7 +334,9 @@ void kmeans_sequential(int N, int K, int* data_points, int** data_point_cluster_
 
 void dataset_in(const char *dataset_filename, int *N, int **data_points)
 {
-	FILE *fin = fopen(dataset_filename, "r");
+    char dir[105]="./datasets/";
+    strcat(dir,dataset_filename); 
+	FILE *fin = fopen(dir, "r");
 	fscanf(fin, "%d", N);
 	*data_points = (int *)malloc(sizeof(int) * ((*N) * 2));
     int i = 0;
@@ -346,7 +349,9 @@ void dataset_in(const char *dataset_filename, int *N, int **data_points)
 
 void clusters_out(const char *cluster_filename, int N, int *cluster_points)
 {
-	FILE *fout = fopen(cluster_filename, "w");
+    char dir[105] = "./output/";
+    strcat(dir,cluster_filename);
+	FILE *fout = fopen(dir, "w");
     int i = 0;
 	for (i = 0; i < N; i++)
 	{
@@ -357,8 +362,20 @@ void clusters_out(const char *cluster_filename, int N, int *cluster_points)
 	fclose(fout);
 }
 
-void draw_chart_gnu(){
+void draw_chart_gnu(char *cluster_filename){
 
-    system("gnuplot -p -e \"plot 'cluster_output_dataset4.txt' using 1:2:3 with points palette notitle\"");
+    
+    char dir[105] = "gnuplot -p -e \"plot ";
+    strcat(dir,"'./output/");
+    strcat(dir,cluster_filename);
+    strcat(dir,"'");
+    strcat(dir,"using 1:2:3 with points palette notitle\"");
 
+    // system("gnuplot -p -e \"plot 'cluster_output_dataset4.txt' using 1:2:3 with points palette notitle\"");
+    system(dir);
+
+}
+
+float eucledian_distance(){
+    
 }
