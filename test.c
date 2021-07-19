@@ -231,57 +231,62 @@ int main(){
     // printf("Number of points %d\n", num_point);
     // printf("Number of clusters %d\n", num_cluster);
 
-    srand(time(NULL));
+    // srand(time(NULL));
 
-    double time_point1 = omp_get_wtime();
 
-    printf("Starting initialization..\n");
+        double time_point1 = omp_get_wtime();
 
-    printf("Creating points..\n");
-    points mypoints = init_points("dataset-1000000.txt",100);
-    printf("Points initialized \n");
+        printf("Starting initialization..\n");
+
+        printf("Creating points..\n");
+        points mypoints = init_points("dataset-1000000.txt",100);
+        printf("Points initialized \n");
+
+        
+        printf("Creating clusters..\n");
+        clusters mycluster = init_clusters(4);
+        printf("Clusters initialized \n");
+
+        double time_point2 = omp_get_wtime();
+        double duration = time_point2 - time_point1;
+
+        printf("Points and clusters generated in: %f seconds\n", duration);
+        printf("number of points: %d\n",mypoints.size);
+        printf("number of cluster: %f\n",mycluster.size);
+
+        bool conv = true;
+        int iterations = 0;
+
+        printf("Starting iterate..\n");
+
+        while(conv && iterations < max_iterations){
+
+            iterations ++;
+
+            compute_distance(&mypoints, &mycluster);
+
+            conv = update_clusters(&mycluster);
+
+            // printf("Iteration %d done \n", iterations);
+
+        }
+
+        double time_point3 = omp_get_wtime();
+        duration = time_point3 - time_point2;
+
+        printf("Number of iterations: %d, total time: %f seconds, time per iteration: %f seconds\n",
+            iterations, duration, duration/iterations);
+
+        result(duration,mypoints.size);
+        printf("Drawing the chart...\n");
+        draw_chart_gnu(&mypoints);
+        plot_result();
+
+        free(mypoints.p);
+        free(mycluster.c);
 
     
-    printf("Creating clusters..\n");
-    clusters mycluster = init_clusters(4);
-    printf("Clusters initialized \n");
 
-    double time_point2 = omp_get_wtime();
-    double duration = time_point2 - time_point1;
 
-    printf("Points and clusters generated in: %f seconds\n", duration);
-    printf("number of points: %d\n",mypoints.size);
-    printf("number of cluster: %f\n",mycluster.c[2].x_coord);
-
-    bool conv = true;
-    int iterations = 0;
-
-    printf("Starting iterate..\n");
-
-     while(conv && iterations < max_iterations){
-
-        iterations ++;
-
-        compute_distance(&mypoints, &mycluster);
-
-        conv = update_clusters(&mycluster);
-
-        // printf("Iteration %d done \n", iterations);
-
-    }
-
-    double time_point3 = omp_get_wtime();
-    duration = time_point3 - time_point2;
-
-    printf("Number of iterations: %d, total time: %f seconds, time per iteration: %f seconds\n",
-           iterations, duration, duration/iterations);
-
-    result(duration,mypoints.size);
-    printf("Drawing the chart...\n");
-    draw_chart_gnu(&mypoints);
-    plot_result();
-
-    // free(&mypoints);
-    // free(&mycluster);
     return 0;
 }

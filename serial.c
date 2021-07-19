@@ -48,7 +48,6 @@ int *data_point_cluster_global;
 //   int x_coord;
 //   int y_coord; 
 //   int cluster_id; 
-//   struct Cluster *cluster;
 
 // };
 
