@@ -114,7 +114,6 @@ double euclidean_dist(point* point, cluster* clust){
 
 void compute_distance(points* po, clusters* clust,int numthreads){
 
-    // printf("%f\n",clust->c[4].x_coord);
     unsigned long points_size = po->size;
     unsigned long clusters_size = clust->size;
 
@@ -216,10 +215,17 @@ void draw_chart_gnu(points* poin){
 
 }
 
-void result(double dur,int size,int numthreads,int num_cluster){
-    char dir[105]="./output/result.txt";
+void time_vs_n(double dur,int size){
+    char dir[105]="./output/time_vs_num_points_parallel.txt";
 	FILE *fout = fopen(dir, "a");
-	fprintf(fout, "%d %f\n",num_cluster, dur);
+	fprintf(fout, "%d %f\n",size, dur);
+
+    fclose(fout);
+}
+void time_vs_thread(double dur,int size,int numthreads,int num_cluster){
+    char dir[105]="./output/time_vs_threads_parallel.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",numthreads, dur);
 
     fclose(fout);
 }
@@ -346,11 +352,12 @@ int main(int argc,char **argv){
         iterations, duration, duration/iterations);
 
 
-    result(duration/iterations,mypoints.size,numthreads,num_cluster);
-    // printf("Drawing the chart...\n");
-    // draw_chart_gnu(&mypoints);
-    // plot_result();
+    time_vs_n(duration/iterations,mypoints.size);
 
+    if(!disable_display){
+        printf("Drawing the chart...\n");
+        draw_chart_gnu(&mypoints);
+    }
     free(mypoints.p);
     free(mycluster.c);
 
