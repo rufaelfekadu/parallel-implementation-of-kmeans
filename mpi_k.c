@@ -5,6 +5,7 @@
 #include <omp.h>
 #include <math.h>
 #include <time.h>
+#include <mpi.h>
 
 #define MATCH(s) (!strcmp(argv[ac], (s)))
 
@@ -216,97 +217,126 @@ void plot_result(){
 }
 int main(int argc,char **argv){
 
+    // initialize the MPI environment
+	MPI_Init(NULL, NULL);
 
-    srand(50);
-    int ac,numthreads = 1;
-    int disable_display = 0;
-    int seedVal = 100;
-    int nx = 1;
-    int num_cluster = 4;
+	// get number of processes
+	int world_size;
+	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    for(ac=1;ac<argc;ac++)
-    {
-        if(MATCH("-n")) {nx = atoi(argv[++ac]);}
-        else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
-        else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
-        else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
-        else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
-        else if(MATCH("-d"))  {disable_display = 1;}
-        else {
-            printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
-            return(-1);
+	// get rank
+	int world_rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    points mypoints;
+    clusters myclusters;
+
+    // send buffers
+	double *k_means_x = NULL;		// k means corresponding x values
+	double *k_means_y = NULL;		// k means corresponding y values
+	int *k_assignment = NULL;		// each data point is assigned to a cluster
+
+	// receive buffer
+	double *recv_x = NULL;
+	double *recv_y = NULL;
+	int *recv_assign = NULL;
+
+    if(world_rank==0){
+        srand(50);
+        int ac,numthreads = 1;
+        int disable_display = 0;
+        int seedVal = 100;
+        int nx = 1;
+        int numOfClusters = 4;
+
+        for(ac=1;ac<argc;ac++)
+        {
+            if(MATCH("-n")) {nx = atoi(argv[++ac]);}
+            else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
+            else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
+            else if(MATCH("-c"))  {numOfClusters = atof(argv[++ac]);}
+            else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
+            else if(MATCH("-d"))  {disable_display = 1;}
+            else {
+                printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
+                return(-1);
+            }
         }
+            char *dataset_filename;
+        switch (nx)
+        {
+        case 1:
+            dataset_filename = "dataset-10000.txt";
+            break;
+        case 2:
+            dataset_filename = "dataset-50000.txt";
+            break;
+        case 3:
+            dataset_filename = "dataset-100000.txt";
+            break;
+        case 4:
+            dataset_filename = "dataset-200000.txt";
+            break;
+        case 5:
+            dataset_filename = "dataset-400000.txt";
+            break;
+        case 6:
+            dataset_filename = "dataset-500000.txt";
+            break;
+        case 7:
+            dataset_filename = "dataset-600000.txt";
+            break;
+        case 8:
+            dataset_filename = "dataset-800000.txt";
+            break;
+        case 9:
+            dataset_filename = "dataset-1000000.txt";
+            break;
+        default:
+            dataset_filename = "dataset-10000.txt";
+            break;
+        }
+
+        MPI_Bcast(&numOfClusters, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        double time_point1 = omp_get_wtime();
+
+        printf("Starting initialization..\n");
+
+        printf("Creating points..\n");
+        points mypoints = init_points(dataset_filename,100);
+        printf("Points initialized \n");
+
+        
+        printf("Creating clusters..\n");
+        clusters mycluster = init_clusters(4);
+        printf("Clusters initialized \n");
+
+        double time_point2 = omp_get_wtime();
+        double duration = time_point2 - time_point1;
+
+        printf("Points and clusters generated in: %f seconds\n", duration);
+        printf("number of points: %d\n",mypoints.size);
+        printf("number of cluster: %d\n",mycluster.size);
+
+
+
+        printf("Starting iterate..\n");
+        double time_point3 = omp_get_wtime();
+
     }
-
-    char *dataset_filename;
-    switch (nx)
-    {
-    case 1:
-        dataset_filename = "dataset-10000.txt";
-        break;
-    case 2:
-        dataset_filename = "dataset-50000.txt";
-        break;
-    case 3:
-        dataset_filename = "dataset-100000.txt";
-        break;
-    case 4:
-        dataset_filename = "dataset-200000.txt";
-        break;
-    case 5:
-        dataset_filename = "dataset-400000.txt";
-        break;
-    case 6:
-        dataset_filename = "dataset-500000.txt";
-        break;
-    case 7:
-        dataset_filename = "dataset-600000.txt";
-        break;
-    case 8:
-        dataset_filename = "dataset-800000.txt";
-        break;
-    case 9:
-        dataset_filename = "dataset-1000000.txt";
-        break;
-    default:
-        dataset_filename = "dataset-10000.txt";
-        break;
-    }
-
-
-
-    double time_point1 = omp_get_wtime();
-
-    printf("Starting initialization..\n");
-
-    printf("Creating points..\n");
-    points mypoints = init_points(dataset_filename,100);
-    printf("Points initialized \n");
-
     
-    printf("Creating clusters..\n");
-    clusters mycluster = init_clusters(4);
-    printf("Clusters initialized \n");
-
-    double time_point2 = omp_get_wtime();
-    double duration = time_point2 - time_point1;
-
-    printf("Points and clusters generated in: %f seconds\n", duration);
-    printf("number of points: %d\n",mypoints.size);
-    printf("number of cluster: %d\n",mycluster.size);
-
     bool conv = true;
     int iterations = 0;
-
-    printf("Starting iterate..\n");
     double time_point3 = omp_get_wtime();
+
     while(conv && iterations < max_iterations){
 
         iterations ++;
 
-        compute_distance(&mypoints, &mycluster);
+        compute_distance(&mypoints, &myclusters);
 
-        conv = update_clusters(&mycluster);
+        conv = update_clusters(&myclusters);
 
         // printf("Iteration %d done \n", iterations);
 
