@@ -8,12 +8,14 @@
 #include<errno.h>
 #include<mpi.h>
 
-#define MAX_ITERATIONS 1000
-typedef enum {false, true} bool;
+#define MATCH(s) (!strcmp(argv[ac], (s)))
+
+int MAX_ITERATIONS = 1000;
+// typedef enum {false, true} bool;
 
 int numOfClusters = 0;
 int numOfElements = 0;
-int num_of_processes = 0;
+int num_of_processes = 2;
 
 /* This function goes through that data points and assigns them to a cluster */
 void assign2Cluster(double k_x[], double k_y[], double recv_x[], double recv_y[], int assign[])
@@ -68,6 +70,10 @@ void calcKmeans(double k_means_x[], double k_means_y[], double data_x_points[], 
 			}
 		}
 
+		// if(clus->x_coord == clus->new_x_coord/clus->size && clus->y_coord == clus->new_y_coord/clus->size){
+        // 	return false;
+    	// }
+
 		if(numOfpoints != 0)
 		{
 			k_means_x[i] = total_x / numOfpoints;
@@ -121,29 +127,42 @@ int main(int argc, char *argv[])
 	double *recv_y = NULL;
 	int *recv_assign = NULL;
 
+			int ac,numthreads = 1;
+		int disable_display = 0;
+		int seedVal = 100;
+		int nx = 1;
+		int num_cluster = 4;
+
+		for(ac=1;ac<argc;ac++)
+		{
+			if(MATCH("-n")) {nx = atoi(argv[++ac]);}
+			else if(MATCH("-i")) {MAX_ITERATIONS = atoi(argv[++ac]);}
+			else if(MATCH("-p")) {num_of_processes = atoi(argv[++ac]);}
+			else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
+			else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
+			else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
+			else if(MATCH("-d"))  {disable_display = 1;}
+			else {
+				printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
+				return(-1);
+			}
+		}
+
 	if(world_rank == 0)
 	{
-		printf("%d",world_size);
-		if(argc != 2)
+		if(argc < 2)
 		{
 			printf("Please include an argument after the program name to list how many processes.\n");
-			printf("e.g. To indicate 4 processes, run: mpirun -n 4 ./kmeans 4\n");
+			printf("e.g. To indicate 4 processes, run: mpirun -n 4 ./kmeans -p 4\n");
 			exit(-1);
 		}
 
-		num_of_processes = atoi(argv[1]);
-		printf("How many clusters would you like to analyze for? ");
-		char buffer[2];
-		
-		scanf("%s", buffer);
-		printf("\n");
 
-		numOfClusters = atoi(buffer);
-		printf("Ok %d clusters it is.\n", numOfClusters);
+		srand(50);
 
 
 		// broadcast the number of clusters to all nodes
-		MPI_Bcast(&numOfClusters, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		MPI_Bcast(&num_cluster, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 		// allocate memory for arrays
 		k_means_x = (double *)malloc(sizeof(double) * numOfClusters);
@@ -157,29 +176,10 @@ int main(int argc, char *argv[])
 
 		printf("Reading input data from file...\n\n");
 
-		// FILE* fp = fopen("datasets/dataset-10000.txt", "r");
-
-		// if(!fp)
-		// {
-		// 	perror("fopen");
-		// 	exit(-1);
-		// }
-
 		// count number of lines to find out how many elements
 		int c = 0;
 		numOfElements = 0;
-		// while(!feof(fp))
-		// {
-		// 	c = fgetc(fp);
-		// 	if(c == '\n')
-		// 	{
-		// 		numOfElements++;
-		// 	}
-		// }
-
-        char dir[105]="./datasets/";
-        strcat(dir,"dataset-10000.txt"); 
-        FILE *fin = fopen(dir, "r");
+        FILE *fin = fopen("./datasets/dataset-10000.txt", "r");
         fscanf(fin, "%d", &numOfElements);
 
 		printf("There are a total number of %d elements in the file.\n", numOfElements);
@@ -198,23 +198,6 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
-		// reset file pointer to origin of file
-		// fseek(fp, 0, SEEK_SET);
-
-		// // now read in points and fill the arrays
-		// int i = 0;
-
-		// double point_x=0, point_y=0;
-
-		// while(fscanf(fp, "%lf %lf", &point_x, &point_y) != EOF)
-		// {
-		// 	data_x_points[i] = point_x;
-		// 	data_y_points[i] = point_y;
-
-		// 	// assign the initial k means to zero
-		// 	k_assignment[i] = 0;
-		// 	i++;
-		// }
         for(int i=0;i<numOfElements;i++){
             int x,y;
             fscanf(fin, "%d %d",&x,&y);
@@ -253,12 +236,24 @@ int main(int argc, char *argv[])
 			perror("malloc");
 			exit(-1);
 		}
+		printf("something");
 	}
 	else
-	{	// I am a worker node
-		printf("Worker node");
-		num_of_processes = atoi(argv[1]);
+	{	
+		// I am a worker node
+		// num_of_processes = atoi(argv[1]);
 
+		// for(int ac=1;ac<argc;ac++)
+		// {
+		// 	if(MATCH("-p")) {num_of_processes = atoi(argv[++ac]);}
+		// 	if(MATCH("-i")) {MAX_ITERATIONS = atoi(argv[++ac]);}
+		// 	else {
+		// 		printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
+		// 		return(-1);
+		// 	}
+		// }
+
+		
 		// receive broadcast of number of clusters
 		MPI_Bcast(&numOfClusters, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -285,8 +280,9 @@ int main(int argc, char *argv[])
 			perror("malloc");
 			exit(-1);
 		}
+		
 	}
-
+	
 	/* Distribute the work among all nodes. The data points itself will stay constant and
 	   not change for the duration of the algorithm. */
 	MPI_Scatter(data_x_points, (numOfElements/num_of_processes) + 1, MPI_DOUBLE,
@@ -298,6 +294,7 @@ int main(int argc, char *argv[])
 	int count = 0;
 	while(count < MAX_ITERATIONS)
 	{
+		printf("iteration %d",count);
 		// broadcast k-means arrays
 		MPI_Bcast(k_means_x, numOfClusters, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 		MPI_Bcast(k_means_y, numOfClusters, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -326,7 +323,7 @@ int main(int argc, char *argv[])
 	if(world_rank == 0)
 	{
 	    // MPI_Barrier(MPI_COMM_WORLD);
-        out_file(data_x_points,data_y_points,k_assignment,numOfElements);
+        // out_file(data_x_points,data_y_points,k_assignment,numOfElements);
         // out_file(k_means_x,k_means_y,k_assignment,numOfElements);
 		printf("--------------------------------------------------\n");
 		printf("FINAL RESULTS:\n");

@@ -11,6 +11,9 @@
 
 int max_range = 800;
 int max_iterations = 100;
+int numberOfElements;
+int num_process;
+int numOfClusters = 4;
 
 struct Cluster{
 
@@ -76,7 +79,7 @@ points init_points(const char *dataset_filename,int num_points){
     strcat(dir,dataset_filename); 
 	FILE *fin = fopen(dir, "r");
 	fscanf(fin, "%d", &po.size);
-
+    numberOfElements = po.size;
     po.p = (point*)malloc(sizeof(point)*po.size);
     po.items =0;
     for(int i=0;i<po.size;i++){
@@ -237,8 +240,8 @@ int main(int argc,char **argv){
 	int *k_assignment = NULL;		// each data point is assigned to a cluster
 
 	// receive buffer
-	double *recv_x = NULL;
-	double *recv_y = NULL;
+	int *recv_x = NULL;
+	int *recv_y = NULL;
 	int *recv_assign = NULL;
 
     if(world_rank==0){
@@ -247,12 +250,12 @@ int main(int argc,char **argv){
         int disable_display = 0;
         int seedVal = 100;
         int nx = 1;
-        int numOfClusters = 4;
 
         for(ac=1;ac<argc;ac++)
         {
             if(MATCH("-n")) {nx = atoi(argv[++ac]);}
             else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
+            else if(MATCH("-p")) {num_process = atoi(argv[++ac]);}
             else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
             else if(MATCH("-c"))  {numOfClusters = atof(argv[++ac]);}
             else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
@@ -299,33 +302,97 @@ int main(int argc,char **argv){
 
         MPI_Bcast(&numOfClusters, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-        double time_point1 = omp_get_wtime();
-
         printf("Starting initialization..\n");
 
         printf("Creating points..\n");
-        points mypoints = init_points(dataset_filename,100);
+        mypoints = init_points(dataset_filename,100);
         printf("Points initialized \n");
 
+
+        printf("There are a total number of %d elements in the file.\n", numberOfElements);
+
+		// broadcast the number of elements to all nodes
+		MPI_Bcast(&numberOfElements, 1, MPI_INT, 0, MPI_COMM_WORLD);
         
         printf("Creating clusters..\n");
-        clusters mycluster = init_clusters(4);
+        myclusters = init_clusters(4);
         printf("Clusters initialized \n");
 
-        double time_point2 = omp_get_wtime();
-        double duration = time_point2 - time_point1;
-
-        printf("Points and clusters generated in: %f seconds\n", duration);
-        printf("number of points: %d\n",mypoints.size);
-        printf("number of cluster: %d\n",mycluster.size);
-
-
+        // printf("Points and clusters generated in: %f seconds\n", duration);
+        // printf("number of points: %d\n",mypoints.size);
+        // printf("number of cluster: %d\n",mycluster.size);
 
         printf("Starting iterate..\n");
         double time_point3 = omp_get_wtime();
 
+        // allocate memory for receive buffers
+		recv_x = (int *)malloc(sizeof(int) * ((numberOfElements/num_process) + 1));
+		recv_y = (int *)malloc(sizeof(int) * ((numberOfElements/num_process) + 1));
+		recv_assign = (int *)malloc(sizeof(int) * ((numberOfElements/num_process) + 1));
+
+        if(recv_x == NULL || recv_y == NULL || recv_assign == NULL)
+		{
+			perror("malloc");
+			exit(-1);
+		}
+
+    }else{	// I am a worker node
+        int ac;
+        for(ac=1;ac<argc;ac++)
+        {
+            if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
+            else if(MATCH("-p")) {num_process = atoi(argv[++ac]);}
+            else {
+                printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
+                return(-1);
+            }
+        }
+
+		// num_process = atoi(argv[1]);
+
+		// receive broadcast of number of clusters
+		MPI_Bcast(&numOfClusters, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+		// receive broadcast of number of elements
+		MPI_Bcast(&numberOfElements, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+		// allocate memory for arrays
+		// k_means_x = (double *)malloc(sizeof(double) * numOfClusters);
+		// k_means_y = (double *)malloc(sizeof(double) * numOfClusters);
+
+		// if(k_means_x == NULL || k_means_y == NULL)
+		// {
+		// 	perror("malloc");
+		// 	exit(-1);
+		// }
+
+		// allocate memory for receive buffers
+		recv_x = (int *)malloc(sizeof(int) * ((numberOfElements/num_process) + 1));
+		recv_y = (int *)malloc(sizeof(int) * ((numberOfElements/num_process) + 1));
+		recv_assign = (int *)malloc(sizeof(int) * ((numberOfElements/num_process) + 1));
+
+		if(recv_x == NULL || recv_y == NULL || recv_assign == NULL)
+		{
+			perror("malloc");
+			exit(-1);
+		}
+	}
+
+    int *x;
+    int *y;
+    for(int i=0;i < mypoints.size;i++){
+        x[i] = &mypoints.p[i].x_coord;
+        y[i] = &mypoints.p[i].y_coord; 
     }
-    
+    MPI_Scatter(x, (numberOfElements/num_process) + 1, MPI_INT,
+		recv_x, (numberOfElements/num_process) + 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    MPI_Scatter(x, (numberOfElements/num_process) + 1, MPI_INT,
+		recv_x, (numberOfElements/num_process) + 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+	// MPI_Scatter(data_y_points, (numOfElements/num_of_processes) + 1, MPI_DOUBLE,
+	// 	recv_y, (numOfElements/num_of_processes) + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
     bool conv = true;
     int iterations = 0;
     double time_point3 = omp_get_wtime();

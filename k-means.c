@@ -7,12 +7,14 @@
 #include<math.h>
 #include<errno.h>
 #include<mpi.h>
+#include<time.h>
 
 #define MAX_ITERATIONS 1000
 
 int numOfClusters = 0;
 int numOfElements = 0;
 int num_of_processes = 0;
+int max_range =800;
 
 /* This function goes through that data points and assigns them to a cluster */
 void assign2Cluster(double k_x[], double k_y[], double recv_x[], double recv_y[], int assign[])
@@ -22,6 +24,32 @@ void assign2Cluster(double k_x[], double k_y[], double recv_x[], double recv_y[]
 	int k_min_index = 0;
 
 	for(int i = 0; i < (numOfElements/num_of_processes) + 1; i++)
+	{
+		for(int j = 0; j < numOfClusters; j++)
+		{
+			x = abs(recv_x[i] - k_x[j]);
+			y = abs(recv_y[i] - k_y[j]);
+			temp_dist = sqrt((x*x) + (y*y));
+
+			// new minimum distance found
+			if(temp_dist < min_dist)
+			{
+				min_dist = temp_dist;
+				k_min_index = j;
+			}
+		}
+
+		// update the cluster assignment of this data points
+		assign[i] = k_min_index;
+	}
+
+}
+void assign(double k_x[], double k_y[], double recv_x[], double recv_y[], int assign[]){
+	double min_dist = 10000000;
+	double x=0, y=0, temp_dist=0;
+	int k_min_index = 0;
+
+	for(int i = 0; i < (numOfElements); i++)
 	{
 		for(int j = 0; j < numOfClusters; j++)
 		{
@@ -73,6 +101,24 @@ void calcKmeans(double k_means_x[], double k_means_y[], double data_x_points[], 
 			k_means_y[i] = total_y / numOfpoints;
 		}
 	}
+
+}
+
+void out_file(double *x, double *y, int *k,int numOfElements){
+
+    // char dir[105] = "./output/";
+    // strcat(dir,cluster_filename);
+	FILE *fout = fopen("output/data1.txt", "w");
+
+    for(int i = 0; i < numOfElements; i++){
+
+        fprintf(fout, "%f %f %d\n",x[i],y[i],k[i]);
+
+    }
+
+    fclose(fout);
+    system("gnuplot -p -e \"plot 'output/data1.txt' using 1:2:3 with points palette notitle\"");
+    // remove("data1.txt");
 
 }
 
@@ -146,16 +192,10 @@ int main(int argc, char *argv[])
 		}
 
 		// count number of lines to find out how many elements
-		int c = 0;
-		numOfElements = 0;
-		while(!feof(fp))
-		{
-			c = fgetc(fp);
-			if(c == '\n')
-			{
-				numOfElements++;
-			}
-		}
+		// int c = 0;
+		// numOfElements = 0;
+		FILE *fin = fopen("./datasets/dataset-100000.txt", "r");
+        fscanf(fin, "%d", &numOfElements);
 
 		printf("There are a total number of %d elements in the file.\n", numOfElements);
 
@@ -173,35 +213,26 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
-		// reset file pointer to origin of file
-		fseek(fp, 0, SEEK_SET);
-
-		// now read in points and fill the arrays
-		int i = 0;
-
-		double point_x=0, point_y=0;
-
-		while(fscanf(fp, "%lf %lf", &point_x, &point_y) != EOF)
-		{
-			data_x_points[i] = point_x;
-			data_y_points[i] = point_y;
-
-			// assign the initial k means to zero
-			k_assignment[i] = 0;
-			i++;
-		}
+		for(int i=0;i<numOfElements;i++){
+            int x,y;
+            fscanf(fin, "%d %d",&x,&y);
+            	data_x_points[i] = x;
+		    	data_y_points[i] = y;
+                k_assignment[i] = 0;
+        }
 
 		// close file pointer
 		fclose(fp);
 
 		// randomly select initial k-means
-		time_t t;
-		srand((unsigned) time(&t));
+		// time_t t;
+		// srand((unsigned) time(&t));
+		srand(50);
 		int random;
 		for(int i = 0; i < numOfClusters; i++) {
 			random = rand() % numOfElements;
-			k_means_x[i] = data_x_points[random];
-			k_means_y[i] = data_y_points[random];
+			k_means_x[i] = (rand()-RAND_MAX/2) % (int) max_range;
+			k_means_y[i] = (rand()-RAND_MAX/2) % (int) max_range;
 		}
 
 		printf("Running k-means algorithm for %d iterations...\n\n", MAX_ITERATIONS);
@@ -263,6 +294,9 @@ int main(int argc, char *argv[])
 		recv_y, (numOfElements/num_of_processes) + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	int count = 0;
+
+	// printf("Starting iterate..\n");
+    double t1 = MPI_Wtime(); 
 	while(count < MAX_ITERATIONS)
 	{
 		// broadcast k-means arrays
@@ -284,21 +318,28 @@ int main(int argc, char *argv[])
 		if(world_rank == 0)
 		{
 			calcKmeans(k_means_x, k_means_y, data_x_points, data_y_points, k_assignment);
-			printf("Finished iteration %d\n",count);
+			// printf("Finished iteration %d\n",count);
 		}
 
 		count++;
 	}
 
+	double t2 = MPI_Wtime(); 
+    double duration = t2- t1;
+
 	if(world_rank == 0)
 	{
 		printf("--------------------------------------------------\n");
 		printf("FINAL RESULTS:\n");
+		assign(k_means_x, k_means_y, data_x_points, data_y_points, k_assignment);
+
+		out_file(data_x_points, data_y_points, k_assignment,numOfElements);
 		for(int i = 0; i < numOfClusters; i++)
 		{
 			printf("Cluster #%d: (%f, %f)\n", i, k_means_x[i], k_means_y[i]);
 		}
 		printf("--------------------------------------------------\n");
+		printf("Duration: %f\n",duration);
 	}
 
 	// deallocate memory and clean up
