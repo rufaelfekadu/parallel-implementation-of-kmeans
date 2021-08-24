@@ -73,6 +73,30 @@ void print_centroids(float * centroids, const int k, const int d) {
   }
 }
 
+void mpi_vs_cluster(double dur,int num_cluster){
+    char dir[105]="./output/mpi_vs_cluster.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",num_cluster, dur);
+
+    fclose(fout);
+}
+
+void mpi_vs_point(double dur,int size){
+    char dir[105]="./output/mpi_vs_point.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",size, dur);
+
+    fclose(fout);
+}
+
+void mpi_vs_thread(double dur,int numthread){
+    char dir[105]="./output/mpi_vs_thread.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",numthread, dur);
+
+    fclose(fout);
+}
+
 int main(int argc, char** argv) {
 
     srand(31359);

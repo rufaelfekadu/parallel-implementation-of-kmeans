@@ -81,6 +81,30 @@ void print_centroids(float * centroids, const int k, const int d) {
   }
 }
 
+void mpi_openmp_vs_cluster(double dur,int num_cluster){
+    char dir[105]="./output/mpi_openmp_vs_cluster.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",num_cluster, dur);
+
+    fclose(fout);
+}
+
+void mpi_openmp_vs_point(double dur,int size){
+    char dir[105]="./output/mpi_openmp_vs_point.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",size, dur);
+
+    fclose(fout);
+}
+
+void mpi_openmp_vs_thread(double dur,int numthread){
+    char dir[105]="./output/mpi_openmp_vs_thread.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",numthread, dur);
+
+    fclose(fout);
+}
+
 int main(int argc, char** argv) {
 
     srand(31359);
@@ -278,6 +302,10 @@ int main(int argc, char** argv) {
     float time_taken = t2-t1;
     printf("number of iteration: %d\n",itr); 
     printf("time taken per iteration: %f\n",time_taken/itr);
+
+    mpi_openmp_vs_cluster(time_taken,num_cluster);
+    mpi_openmp_vs_point(time_taken,num_elements);
+    mpi_openmp_vs_thread(time_taken,num_threads);
     if(!disable_display){
 
       FILE *fout = fopen("output/data1.txt", "w");

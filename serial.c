@@ -201,10 +201,18 @@ void draw_chart_gnu(points* poin){
 
 }
 
-void result(double dur,int size,int num_cluster){
-    char dir[105]="./output/result.txt";
+void serial_vs_cluster(double dur,int num_cluster){
+    char dir[105]="./output/serial_vs_cluster.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",num_cluster, dur);
+
+    fclose(fout);
+}
+
+void serial_vs_point(double dur,int size){
+    char dir[105]="./output/serial_vs_point.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",size, dur);
 
     fclose(fout);
 }
@@ -318,7 +326,9 @@ int main(int argc,char **argv){
     printf("Number of iterations: %d, total time: %f seconds, time per iteration: %f seconds\n",
         iterations, duration, duration/iterations);
 
-    result(duration/iterations,mypoints.size,num_cluster);
+    // result(duration/iterations,mypoints.size,num_cluster);
+    serial_vs_cluster(duration/iterations,num_cluster);
+    serial_vs_point(duration/iterations,mypoints.size);
 
     if(!disable_display){
 

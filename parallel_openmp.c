@@ -215,17 +215,41 @@ void draw_chart_gnu(points* poin){
 
 }
 
-void time_vs_n(double dur,int size){
-    char dir[105]="./output/time_vs_num_points_parallel.txt";
+// void time_vs_n(double dur,int size){
+//     char dir[105]="./output/time_vs_num_points_parallel.txt";
+// 	FILE *fout = fopen(dir, "a");
+// 	fprintf(fout, "%d %f\n",size, dur);
+
+//     fclose(fout);
+// }
+// void time_vs_thread(double dur,int size,int numthreads,int num_cluster){
+//     char dir[105]="./output/time_vs_threads_parallel.txt";
+// 	FILE *fout = fopen(dir, "a");
+// 	fprintf(fout, "%d %f\n",numthreads, dur);
+
+//     fclose(fout);
+// }
+
+void openmp_vs_cluster(double dur,int num_cluster){
+    char dir[105]="./output/openmp_vs_cluster.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",num_cluster, dur);
+
+    fclose(fout);
+}
+
+void openmp_vs_point(double dur,int size){
+    char dir[105]="./output/openmp_vs_point.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",size, dur);
 
     fclose(fout);
 }
-void time_vs_thread(double dur,int size,int numthreads,int num_cluster){
-    char dir[105]="./output/time_vs_threads_parallel.txt";
+
+void openmp_vs_thread(double dur,int numthread){
+    char dir[105]="./output/openmp_vs_thread.txt";
 	FILE *fout = fopen(dir, "a");
-	fprintf(fout, "%d %f\n",numthreads, dur);
+	fprintf(fout, "%d %f\n",numthread, dur);
 
     fclose(fout);
 }
@@ -364,7 +388,10 @@ int main(int argc,char **argv){
         iterations, duration, duration/iterations);
 
 
-    time_vs_n(duration/iterations,mypoints.size);
+    // time_vs_n(duration/iterations,mypoints.size);
+    openmp_vs_cluster(duration/iterations,num_cluster);
+    openmp_vs_point(duration/iterations,mypoints.size);
+    openmp_vs_thread(duration/iterations,numthreads);
 
     if(!disable_display){
         printf("Drawing the chart...\n");
