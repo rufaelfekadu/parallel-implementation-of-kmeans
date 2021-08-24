@@ -399,6 +399,9 @@ int main(int argc,char **argv){
 
     while(conv && iterations < max_iterations){
 
+        MPI_Bcast(k_means_x, numOfClusters, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Bcast(k_means_y, numOfClusters, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
         iterations ++;
 
         compute_distance(&mypoints, &myclusters);

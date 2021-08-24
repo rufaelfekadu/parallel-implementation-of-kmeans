@@ -238,7 +238,7 @@ void plot_result(){
 int main(int argc,char **argv){
 
 
-    srand(50);
+    srand(31359);
     int ac,numthreads = 1;
     int disable_display = 0;
     int seedVal = 100;
@@ -316,7 +316,20 @@ int main(int argc,char **argv){
             #pragma omp section
             {
                 printf("Creating clusters..\n");
-                mycluster = init_clusters(4);
+                mycluster = init_clusters(num_cluster);
+                // mycluster.size=num_cluster;
+                // mycluster.c = (cluster*)malloc(sizeof(cluster)*mycluster.size);
+                // mycluster.items=0;
+                // for(int i = 0; i < mycluster.size; i++){
+
+                //     mycluster.c[i].x_coord = mypoints.p[i].x_coord;
+                //     mycluster.c[i].y_coord = mypoints.p[i].y_coord;
+                //     mycluster.c[i].new_x_coord = 0;
+                //     mycluster.c[i].new_y_coord = 0;
+                //     mycluster.c[i].size = 0;
+                //     mycluster.items++;
+
+                // }
                 printf("Clusters initialized \n");
             }  
         }     

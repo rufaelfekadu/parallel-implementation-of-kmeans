@@ -1,350 +1,309 @@
-/*  This is an implementation of the k-means clustering algorithm (aka Lloyd's algorithm) using MPI (message passing interface). */
-
-#include<stdio.h>
-#include<stdlib.h>
-#include<time.h>
-#include<unistd.h>
-#include<math.h>
-#include<errno.h>
-#include<mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <mpi.h>
+#include <assert.h>
+// #include <cassert>
 
 #define MATCH(s) (!strcmp(argv[ac], (s)))
 
-int MAX_ITERATIONS = 1000;
-// typedef enum {false, true} bool;
+int num_elements,max_iterations=1000;
+// Creates an array of random floats. Each number has a value from 0 - 1
+float* init_points(const char *dataset_filename,int site_per_proc,int nprocs) {
 
-int numOfClusters = 0;
-int numOfElements = 0;
-int num_of_processes = 2;
+  float *all_points = (float *)malloc(sizeof(float) * num_elements * 2);
+  int * num;
+  char dir[105]="./datasets/";
+  strcat(dir,dataset_filename); 
+	FILE *fin = fopen(dir, "r");
+  fscanf(fin, "%d", &num_elements);
 
-/* This function goes through that data points and assigns them to a cluster */
-void assign2Cluster(double k_x[], double k_y[], double recv_x[], double recv_y[], int assign[])
-{
-	double min_dist = 10000000;
-	double x=0, y=0, temp_dist=0;
-	int k_min_index = 0;
+  for(int i=0;i<num_elements*2;i++){
 
-	for(int i = 0; i < (numOfElements/num_of_processes) + 1; i++)
-	{
-		for(int j = 0; j < numOfClusters; j++)
-		{
-			x = abs(recv_x[i] - k_x[j]);
-			y = abs(recv_y[i] - k_y[j]);
-			temp_dist = sqrt((x*x) + (y*y));
+      fscanf(fin, "%f",&all_points[i]);
+  }
 
-			// new minimum distance found
-			if(temp_dist < min_dist)
-			{
-				min_dist = temp_dist;
-				k_min_index = j;
-			}
-		}
+  fclose(fin);
 
-		// update the cluster assignment of this data points
-		assign[i] = k_min_index;
-	}
-
+  return all_points;
 }
 
-/* Recalcuate k-means of each cluster because each data point may have
-   been reassigned to a new cluster for each iteration of the algorithm */
-void calcKmeans(double k_means_x[], double k_means_y[], double data_x_points[], double data_y_points[], int k_assignment[])
-{
-	double total_x = 0;
-	double total_y = 0;
-	int numOfpoints = 0;
-
-	for(int i = 0; i < numOfClusters; i++)
-	{
-		total_x = 0;
-		total_y = 0;
-		numOfpoints = 0;
-
-		for(int j = 0; j < numOfElements; j++)
-		{
-			if(k_assignment[j] == i)
-			{
-				total_x += data_x_points[j];
-				total_y += data_y_points[j];
-				numOfpoints++;
-			}
-		}
-
-		// if(clus->x_coord == clus->new_x_coord/clus->size && clus->y_coord == clus->new_y_coord/clus->size){
-        // 	return false;
-    	// }
-
-		if(numOfpoints != 0)
-		{
-			k_means_x[i] = total_x / numOfpoints;
-			k_means_y[i] = total_y / numOfpoints;
-		}
-	}
-
+// Distance**2 between d-vectors pointed to by v1, v2.
+float distance2(const float *v1, const float *v2, const int d) {
+  float dist = 0.0;
+  for (int i=0; i<d; i++) {
+    float diff = v1[i] - v2[i];
+    dist += diff * diff;
+  }
+  return dist;
 }
 
-//Draw point plot with gnuplot
-void out_file(double *x, double *y, int *k,int numOfElements){
+// Assign a site to the correct cluster by computing its distances to
+// each cluster centroid.
+int assign_site(const float* site, float* centroids, const int k, const int d) {
+  int best_cluster = 0;
+  float best_dist = distance2(site, centroids, d);
+  float* centroid = centroids + d;
+  for (int c = 1; c < k; c++, centroid += d) {
+    float dist = distance2(site, centroid, d);
+    if (dist < best_dist) {
+      best_cluster = c;
+      best_dist = dist;
+    }
+  }
+  return best_cluster;
+}
 
-    // char dir[105] = "./output/";
-    // strcat(dir,cluster_filename);
-	FILE *fout = fopen("output/data1.txt", "w");
 
-    for(int i = 0; i < numOfElements; i++){
+// Add a site (vector) into a sum of sites (vector).
+void add_site(const float * site, float * sum, const int d) {
+  for (int i=0; i<d; i++) {
+  sum[i] += site[i];
+  }
+}
 
-        fprintf(fout, "%f %f %d\n",x[i],y[i],k[i]);
+// Print the centroids one per line.
+void print_centroids(float * centroids, const int k, const int d) {
+  float *p = centroids;
+  printf("Centroids:\n");
+  for (int i = 0; i<k; i++) {
+    for (int j = 0; j<d; j++, p++) {
+      printf("%f ", *p);
+    }
+    printf("\n");
+  }
+}
 
+int main(int argc, char** argv) {
+  // if (argc != 4) {
+  //   fprintf(stderr,
+  //   "Usage: kmeans num_sites_per_proc num_means num_dimensions\n");
+  //   exit(1);
+  // }
+
+  // Get stuff from command line:
+  // number of sites per processor.
+  // number of processors comes from mpirun command line.  -n
+  // num_elements = atoi(argv[1]);
+  // int k = atoi(argv[2]);  // number of clusters.
+  // int d = atoi(argv[3]);  // dimension of data.
+  // Seed the random number generator to get different results each time
+  //  srand(time(NULL));
+  // No, we'd like the same results.
+  srand(31359);
+    int ac = 1;
+    int disable_display = 0;
+    int seedVal = 100;
+    int nx = 1;
+    int num_cluster = 4;
+
+    for(ac=1;ac<argc;ac++)
+    {
+        if(MATCH("-n")) {nx = atoi(argv[++ac]);}
+        else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
+        // else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
+        else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
+        // else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
+        else if(MATCH("-d"))  {disable_display = 1;}
+        else {
+            printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-s seed] [-p prob] [-t numthreads] [-step] [-g <game #>] [-d]\n",argv[0]);
+            return(-1);
+        }
     }
 
-    fclose(fout);
-    system("gnuplot -p -e \"plot 'output/data1.txt' using 1:2:3 with points palette notitle\"");
-    // remove("data1.txt");
+    char dataset_filename[105]="";
+    switch (nx)
+    {
+    case 1:
+        strcat(dataset_filename, "dataset-10000.txt");
+        num_elements = 10000;
+        break;
+    case 2:
+        strcat(dataset_filename, "dataset-50000.txt");
+        num_elements = 50000;
+        break;
+    case 3:
+        strcat(dataset_filename, "dataset-100000.txt");
+        num_elements = 100000;
+        break;
+    case 4:
+        strcat(dataset_filename, "dataset-200000.txt");
+        num_elements = 200000;
+        break;
+    case 5:
+        strcat(dataset_filename, "dataset-400000.txt");
+        num_elements = 400000;
+        break;
+    case 6:
+        strcat(dataset_filename, "dataset-500000.txt");
+        num_elements = 500000;
+        break;
+    case 7:
+        strcat(dataset_filename, "dataset-600000.txt");
+        num_elements = 600000;
+        break;
+    case 8:
+        strcat(dataset_filename, "dataset-800000.txt");
+        num_elements = 800000;
+        break;
+    case 9:
+        strcat(dataset_filename, "dataset-1000000.txt");
+        num_elements = 1000000;
+        break;
+    default:
+        strcat(dataset_filename, "dataset-10000.txt");
+        num_elements = 10000;
+        break;
+    }
 
-}
+  // Initial MPI and find process rank and number of processes.
+  MPI_Init(NULL, NULL);
+  int rank, nprocs;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
-int main(int argc, char *argv[])
-{
-	// initialize the MPI environment
-	MPI_Init(NULL, NULL);
+  int sites_per_proc = num_elements/nprocs ;
+  //
+  // Data structures in all processes.
+  //
+  // The sites assigned to this process.
+  float* sites;  
+  // assert(sites = malloc(sites_per_proc * d * sizeof(float)));
+  sites = (float *)malloc(sites_per_proc * 2 * sizeof(float));
+  // The sum of sites assigned to each cluster by this process.
+  // k vectors of d elements.
+  float* sums;
+  // assert(sums = malloc(k * d * sizeof(float)));
+  sums = (float *)malloc(num_cluster * 2 * sizeof(float));
+  // The number of sites assigned to each cluster by this process. k integers.
+  int* counts;
+  // assert(counts = malloc(k * sizeof(int)));
+  counts =(int *) malloc(num_cluster * sizeof(int));
+  // The current centroids against which sites are being compared.
+  // These are shipped to the process by the root process.
+  float* centroids;
+  // assert(centroids = malloc(k * d * sizeof(float)));
+  centroids = (float *)malloc(num_cluster * 2 * sizeof(float));
+  // The cluster assignments for each site.
+  int* labels;
+  // assert(labels = malloc(sites_per_proc * sizeof(int)));
+  labels = (int *)malloc(sites_per_proc * sizeof(int));
 
-	// get number of processes
-	int world_size;
-	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  //
+  // Data structures maintained only in root process.
+  //
+  // All the sites for all the processes.
+  // site_per_proc * nprocs vectors of d floats.
+  float* all_sites = NULL;
+  // Sum of sites assigned to each cluster by all processes.
+  float* grand_sums = NULL;
+  // Number of sites assigned to each cluster by all processes.
+  int* grand_counts = NULL;
+  // Result of program: a cluster label for each site.
+  int* all_labels;
+  if (rank == 0) {
+    float *x,*y;
+    all_sites = init_points(dataset_filename,sites_per_proc,nprocs);
+    // Take the first k sites as the initial cluster centroids.
+    for (int i = 0; i < num_cluster * 2; i++) {
+      centroids[i] = all_sites[i]; 
+    }
+    // print_centroids(centroids, k, d);
 
-	// get rank
-	int world_rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    grand_sums = (float *)malloc(num_cluster * 2 * sizeof(float));
 
-	// send buffers
-	double *k_means_x = NULL;		// k means corresponding x values
-	double *k_means_y = NULL;		// k means corresponding y values
-	int *k_assignment = NULL;		// each data point is assigned to a cluster
-	double *data_x_points = NULL;
-	double *data_y_points = NULL;
+    grand_counts = (int *)malloc(num_cluster * sizeof(int));
 
-	// receive buffer
-	double *recv_x = NULL;
-	double *recv_y = NULL;
-	int *recv_assign = NULL;
+    all_labels = (int *)malloc(nprocs * sites_per_proc * sizeof(int));
+  }
 
-			int ac,numthreads = 1;
-		int disable_display = 0;
-		int seedVal = 100;
-		int nx = 1;
-		int num_cluster = 4;
-
-		for(ac=1;ac<argc;ac++)
-		{
-			if(MATCH("-n")) {nx = atoi(argv[++ac]);}
-			else if(MATCH("-i")) {MAX_ITERATIONS = atoi(argv[++ac]);}
-			else if(MATCH("-p")) {num_of_processes = atoi(argv[++ac]);}
-			else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
-			else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
-			else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
-			else if(MATCH("-d"))  {disable_display = 1;}
-			else {
-				printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
-				return(-1);
-			}
-		}
-
-	if(world_rank == 0)
-	{
-		if(argc < 2)
-		{
-			printf("Please include an argument after the program name to list how many processes.\n");
-			printf("e.g. To indicate 4 processes, run: mpirun -n 4 ./kmeans -p 4\n");
-			exit(-1);
-		}
+  // Root sends each process its share of sites.
+  MPI_Scatter(all_sites,2*sites_per_proc, MPI_FLOAT, sites, 2*sites_per_proc, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
 
-		srand(50);
+  float norm = 1.0;  // Will tell us if centroids have moved.
 
+  float t1 = MPI_Wtime();
+  int itr = 1;
+  while (norm > 0.00001) { 
 
-		// broadcast the number of clusters to all nodes
-		MPI_Bcast(&num_cluster, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // Broadcast the current cluster centroids to all processes.
+    MPI_Bcast(centroids, num_cluster*2, MPI_FLOAT,0, MPI_COMM_WORLD);
 
-		// allocate memory for arrays
-		k_means_x = (double *)malloc(sizeof(double) * numOfClusters);
-		k_means_y = (double *)malloc(sizeof(double) * numOfClusters);
+    // Each process reinitializes its cluster accumulators.
+    for (int i = 0; i < num_cluster*2; i++) sums[i] = 0.0;
+    for (int i = 0; i < num_cluster; i++) counts[i] = 0;
 
-		if(k_means_x == NULL || k_means_y == NULL)
-		{
-			perror("malloc");
-			exit(-1);
-		}
+    // Find the closest centroid to each site and assign to cluster.
+    float* site = sites;
+    for (int i = 0; i < sites_per_proc; i++, site += 2) {
+      int cluster = assign_site(site, centroids, num_cluster, 2);
+      // Record the assignment of the site to the cluster.
+      counts[cluster]++;
+      add_site(site, &sums[cluster*2], 2);
+    }
 
-		printf("Reading input data from file...\n\n");
+    // Gather and sum at root all cluster sums for individual processes.
+    MPI_Reduce(sums, grand_sums, num_cluster * 2, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(counts, grand_counts, num_cluster, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-		// count number of lines to find out how many elements
-		int c = 0;
-		numOfElements = 0;
-        FILE *fin = fopen("./datasets/dataset-10000.txt", "r");
-        fscanf(fin, "%d", &numOfElements);
+    if (rank == 0) {
+      // Root process computes new centroids by dividing sums per cluster
+      // by count per cluster.
+      for (int i = 0; i<num_cluster; i++) {
+      for (int j = 0; j<2; j++) {
+      int dij = 2*i + j;
+      grand_sums[dij] /= grand_counts[i];
+      }
+    }
+    // Have the centroids changed much?
+    norm = distance2(grand_sums, centroids, 2*num_cluster);
+    printf("norm: %f\n",norm);
+    // Copy new centroids from grand_sums into centroids.
+    for (int i=0; i<num_cluster*2; i++) {
+      centroids[i] = grand_sums[i];
+    }
+    print_centroids(centroids,num_cluster,2);
+    }
+    // Broadcast the norm.  All processes will use this in the loop test.
+    MPI_Bcast(&norm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    itr++;
+  }
 
-		printf("There are a total number of %d elements in the file.\n", numOfElements);
+  // Now centroids are fixed, so compute a final label for each site.
+  float* site = sites;
+  for (int i = 0; i < sites_per_proc; i++, site += 2) {
+    labels[i] = assign_site(site, centroids, num_cluster, 2);
+  }
 
-		// broadcast the number of elements to all nodes
-		MPI_Bcast(&numOfElements, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  // Gather all labels into root process.
+  MPI_Gather(labels, sites_per_proc, MPI_INT, all_labels, sites_per_proc, MPI_INT, 0, MPI_COMM_WORLD);
 
-		// allocate memory for an array of data points
-		data_x_points = (double *)malloc(sizeof(double) * numOfElements);
-		data_y_points = (double *)malloc(sizeof(double) * numOfElements);
-		k_assignment = (int *)malloc(sizeof(int) * numOfElements);
+  float t2 = MPI_Wtime();
+  // Root can print out all sites and labels.
+  if ((rank == 0) && 1) {
+    float time_taken = t2-t1;
+    printf("number of iteration: %d\n",itr); 
+    printf("time taken per iteration: %f\n",time_taken/itr);
+    if(!disable_display){
 
-		if(data_x_points == NULL || data_y_points == NULL || k_assignment == NULL)
-		{
-			perror("malloc");
-			exit(-1);
-		}
+      FILE *fout = fopen("output/data1.txt", "w");
+      float* site = all_sites; 
+      for (int i = 0; i < nprocs * sites_per_proc; i++, site += 2) {
 
-        for(int i=0;i<numOfElements;i++){
-            int x,y;
-            fscanf(fin, "%d %d",&x,&y);
-            	data_x_points[i] = x;
-		    	data_y_points[i] = y;
-                k_assignment[i] = 0;
+        for (int j = 0; j < 2; j++) {
+          fprintf(fout,"%f ", site[j]);
         }
-		// close file pointer
-		fclose(fin);
-        // out_file(data_x_points,data_y_points,k_assignment,numOfElements);
 
+        fprintf(fout, "%4d\n",all_labels[i]);
+      }
+        fclose(fout);
+        system("gnuplot -p -e \"plot 'output/data1.txt' using 1:2:3 with points palette notitle\"");
+        remove("data1.txt");
+    }
 
-		// randomly select initial k-means
-		time_t t;
-		srand((unsigned) time(&t));
-		int random;
-		for(int i = 0; i < numOfClusters; i++) {
-			random = rand() % numOfElements;
-			k_means_x[i] = data_x_points[random];
-			k_means_y[i] = data_y_points[random];
-		}
+  } 
+    
 
-		printf("Running k-means algorithm for %d iterations...\n\n", MAX_ITERATIONS);
-		for(int i = 0; i < numOfClusters; i++)
-		{
-			printf("Initial K-means: (%f, %f)\n", k_means_x[i], k_means_y[i]);
-		}
-
-		// allocate memory for receive buffers
-		recv_x = (double *)malloc(sizeof(double) * ((numOfElements/num_of_processes) + 1));
-		recv_y = (double *)malloc(sizeof(double) * ((numOfElements/num_of_processes) + 1));
-		recv_assign = (int *)malloc(sizeof(int) * ((numOfElements/num_of_processes) + 1));
-
-		if(recv_x == NULL || recv_y == NULL || recv_assign == NULL)
-		{
-			perror("malloc");
-			exit(-1);
-		}
-		printf("something");
-	}
-	else
-	{	
-		// I am a worker node
-		// num_of_processes = atoi(argv[1]);
-
-		// for(int ac=1;ac<argc;ac++)
-		// {
-		// 	if(MATCH("-p")) {num_of_processes = atoi(argv[++ac]);}
-		// 	if(MATCH("-i")) {MAX_ITERATIONS = atoi(argv[++ac]);}
-		// 	else {
-		// 		printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
-		// 		return(-1);
-		// 	}
-		// }
-
-		
-		// receive broadcast of number of clusters
-		MPI_Bcast(&numOfClusters, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-		// receive broadcast of number of elements
-		MPI_Bcast(&numOfElements, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-		// allocate memory for arrays
-		k_means_x = (double *)malloc(sizeof(double) * numOfClusters);
-		k_means_y = (double *)malloc(sizeof(double) * numOfClusters);
-
-		if(k_means_x == NULL || k_means_y == NULL)
-		{
-			perror("malloc");
-			exit(-1);
-		}
-
-		// allocate memory for receive buffers
-		recv_x = (double *)malloc(sizeof(double) * ((numOfElements/num_of_processes) + 1));
-		recv_y = (double *)malloc(sizeof(double) * ((numOfElements/num_of_processes) + 1));
-		recv_assign = (int *)malloc(sizeof(int) * ((numOfElements/num_of_processes) + 1));
-
-		if(recv_x == NULL || recv_y == NULL || recv_assign == NULL)
-		{
-			perror("malloc");
-			exit(-1);
-		}
-		
-	}
-	
-	/* Distribute the work among all nodes. The data points itself will stay constant and
-	   not change for the duration of the algorithm. */
-	MPI_Scatter(data_x_points, (numOfElements/num_of_processes) + 1, MPI_DOUBLE,
-		recv_x, (numOfElements/num_of_processes) + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-	MPI_Scatter(data_y_points, (numOfElements/num_of_processes) + 1, MPI_DOUBLE,
-		recv_y, (numOfElements/num_of_processes) + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-	int count = 0;
-	while(count < MAX_ITERATIONS)
-	{
-		printf("iteration %d",count);
-		// broadcast k-means arrays
-		MPI_Bcast(k_means_x, numOfClusters, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(k_means_y, numOfClusters, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-		// scatter k-cluster assignments array
-		MPI_Scatter(k_assignment, (numOfElements/num_of_processes) + 1, MPI_INT,
-			recv_assign, (numOfElements/num_of_processes) + 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-		// assign the data points to a cluster
-		assign2Cluster(k_means_x, k_means_y, recv_x, recv_y, recv_assign);
-
-		// gather back k-cluster assignments
-		MPI_Gather(recv_assign, (numOfElements/num_of_processes)+1, MPI_INT,
-			k_assignment, (numOfElements/num_of_processes)+1, MPI_INT, 0, MPI_COMM_WORLD);
-
-		// let the root process recalculate k means
-		if(world_rank == 0)
-		{
-			calcKmeans(k_means_x, k_means_y, data_x_points, data_y_points, k_assignment);
-			printf("Finished iteration %d %f %f \n",count,k_means_x[0],k_means_y[0]);
-		}
-
-		count++;
-	}
-
-	if(world_rank == 0)
-	{
-	    // MPI_Barrier(MPI_COMM_WORLD);
-        // out_file(data_x_points,data_y_points,k_assignment,numOfElements);
-        // out_file(k_means_x,k_means_y,k_assignment,numOfElements);
-		printf("--------------------------------------------------\n");
-		printf("FINAL RESULTS:\n");
-		for(int i = 0; i < numOfClusters; i++)
-		{
-			printf("Cluster #%d: (%f, %f)\n", i, k_means_x[i], k_means_y[i]);
-		}
-		printf("--------------------------------------------------\n");
-	}
-
-	// deallocate memory and clean up
-	free(k_means_x);
-	free(k_means_y);
-	free(data_x_points);
-	free(data_y_points);
-	free(k_assignment);
-	free(recv_x);
-	free(recv_y);
-	free(recv_assign);
-
-	//MPI_Barrier(MPI_COMM_WORLD);
-	MPI_Finalize();
+  MPI_Finalize();
 
 }
