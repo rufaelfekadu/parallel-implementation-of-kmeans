@@ -237,7 +237,6 @@ void plot_result(){
 }
 int main(int argc,char **argv){
 
-
     srand(31359);
     int ac,numthreads = 1;
     int disable_display = 0;

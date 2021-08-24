@@ -282,7 +282,7 @@ void plot_result(){
 int main(int argc,char **argv){
 
     pthread_mutex_init(&mutexcluster, NULL);
-    srand(50);
+    srand(31359);
     int ac,numthreads = 1;
     int disable_display = 0;
     int seedVal = 100;

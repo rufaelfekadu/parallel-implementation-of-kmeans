@@ -197,7 +197,7 @@ void draw_chart_gnu(points* poin){
 
     fclose(fout);
     system("gnuplot -p -e \"plot 'data.txt' using 1:2:3 with points palette notitle\"");
-    // remove("data.txt");
+    remove("data.txt");
 
 }
 
@@ -217,7 +217,7 @@ void plot_result(){
 int main(int argc,char **argv){
 
 
-    srand(50);
+    srand(31359);
     int ac,numthreads = 1;
     int disable_display = 0;
     int seedVal = 100;

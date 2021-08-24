@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include <omp.h>
 #include <assert.h>
+#include <float.h>
 
 #define MATCH(s) (!strcmp(argv[ac], (s)))
 
@@ -39,17 +41,23 @@ float distance2(const float *v1, const float *v2, const int d) {
 
 // Assign a site to the correct cluster by computing its distances to
 // each cluster centroid.
-int assign_site(const float* site, float* centroids, const int k, const int d) {
+int assign_site(const float* site, float* centroids, const int k, const int d, const int numthreads) {
   int best_cluster = 0;
   float best_dist = distance2(site, centroids, d);
   float* centroid = centroids + d;
-  for (int c = 1; c < k; c++, centroid += d) {
-    float dist = distance2(site, centroid, d);
-    if (dist < best_dist) {
-      best_cluster = c;
-      best_dist = dist;
+  int c ;
+ 
+    #pragma omp for  schedule(static)
+    for (c = 1; c < k; c++) {
+        
+        float dist = distance2(site, centroid, d);
+        if (dist < best_dist) {
+            best_cluster = c;
+            best_dist = dist;
+        }
+        centroid += d;
     }
-  }
+  
   return best_cluster;
 }
 
@@ -81,12 +89,13 @@ int main(int argc, char** argv) {
     int seedVal = 100;
     int nx = 1;
     int num_cluster = 4;
+    int num_threads = 1;
 
     for(ac=1;ac<argc;ac++)
     {
         if(MATCH("-n")) {nx = atoi(argv[++ac]);}
         else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
-        // else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
+        else if(MATCH("-t"))  {num_threads = atof(argv[++ac]);}
         else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
         // else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
         else if(MATCH("-d"))  {disable_display = 1;}
@@ -192,7 +201,7 @@ int main(int argc, char** argv) {
       centroids[i] = all_sites[i];
       // centroids[i] = (rand()-RAND_MAX/2) % (int) max_range; 
     }
-    // print_centroids(centroids, k, d);
+    print_centroids(centroids, num_cluster, 2);
 
     grand_sums = (float *)malloc(num_cluster * 2 * sizeof(float));
 
@@ -221,7 +230,7 @@ int main(int argc, char** argv) {
     // Find the closest centroid to each site and assign to cluster.
     float* site = sites;
     for (int i = 0; i < sites_per_proc; i++, site += 2) {
-      int cluster = assign_site(site, centroids, num_cluster, 2);
+      int cluster = assign_site(site, centroids, num_cluster, 2,num_threads);
       // Record the assignment of the site to the cluster.
       counts[cluster]++;
       add_site(site, &sums[cluster*2], 2);
@@ -257,7 +266,7 @@ int main(int argc, char** argv) {
   // Now centroids are fixed, so compute a final label for each site.
   float* site = sites;
   for (int i = 0; i < sites_per_proc; i++, site += 2) {
-    labels[i] = assign_site(site, centroids, num_cluster, 2);
+    labels[i] = assign_site(site, centroids, num_cluster, 2,num_threads);
   }
 
   // Gather all labels into root process.
