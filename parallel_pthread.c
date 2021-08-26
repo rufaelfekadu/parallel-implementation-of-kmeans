@@ -266,21 +266,21 @@ void draw_chart_gnu(points* poin){
 
 }
 
-void result(double dur,int size,int num_cluster){
-    char dir[105]="./output/result.txt";
-	FILE *fout = fopen(dir, "a");
-	fprintf(fout, "%d %f\n",num_cluster, dur);
-
-    fclose(fout);
-}
-
-// void pthread_vs_cluster(double dur,int num_cluster){
-//     char dir[105]="./output/to_plot/pthread_vs_cluster.txt";
+// void result(double dur,int size,int num_cluster){
+//     char dir[105]="./output/result.txt";
 // 	FILE *fout = fopen(dir, "a");
 // 	fprintf(fout, "%d %f\n",num_cluster, dur);
 
 //     fclose(fout);
 // }
+
+void pthread_vs_cluster(double dur,int num_cluster){
+    char dir[105]="./output/to_plot/pthread_vs_cluster.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",num_cluster, dur);
+
+    fclose(fout);
+}
 
 void pthread_vs_point(double dur,int size){
     char dir[105]="./output/to_plot/pthread_vs_point.txt";
@@ -428,9 +428,9 @@ int main(int argc,char **argv){
         iterations, duration, duration/iterations);
 
     // result(duration/iterations,mypoints.size,num_cluster);
-    pthread_vs_point(duration/iteration,mypoints.size);
-    pthread_vs_cluster(duration/iteration,num_cluster);
-    pthread_vs_thread(duration/iteration,numthreads);
+    pthread_vs_point(duration/iterations,mypoints.size);
+    pthread_vs_cluster(duration/iterations,num_cluster);
+    pthread_vs_thread(duration/iterations,numthreads);
 
     if(!disable_display){
 
