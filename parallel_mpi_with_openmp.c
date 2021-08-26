@@ -82,7 +82,7 @@ void print_centroids(float * centroids, const int k, const int d) {
 }
 
 void mpi_openmp_vs_cluster(double dur,int num_cluster){
-    char dir[105]="./output/mpi_openmp_vs_cluster.txt";
+    char dir[105]="./output/to_plot/mpi_openmp_vs_cluster.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",num_cluster, dur);
 
@@ -90,7 +90,7 @@ void mpi_openmp_vs_cluster(double dur,int num_cluster){
 }
 
 void mpi_openmp_vs_point(double dur,int size){
-    char dir[105]="./output/mpi_openmp_vs_point.txt";
+    char dir[105]="./output/to_plot/mpi_openmp_vs_point.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",size, dur);
 
@@ -98,7 +98,7 @@ void mpi_openmp_vs_point(double dur,int size){
 }
 
 void mpi_openmp_vs_thread(double dur,int numthread){
-    char dir[105]="./output/mpi_openmp_vs_thread.txt";
+    char dir[105]="./output/to_plot/mpi_openmp_vs_thread.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",numthread, dur);
 
@@ -308,7 +308,7 @@ int main(int argc, char** argv) {
     mpi_openmp_vs_thread(time_taken,num_threads);
     if(!disable_display){
 
-      FILE *fout = fopen("output/data1.txt", "w");
+      FILE *fout = fopen("output/data.txt", "w");
       float* site = all_sites; 
       for (int i = 0; i < nprocs * sites_per_proc; i++, site += 2) {
 
@@ -319,13 +319,13 @@ int main(int argc, char** argv) {
         fprintf(fout, "%4d\n",all_labels[i]);
       }
         fclose(fout);
-        system("gnuplot -p -e \"plot 'output/data1.txt' using 1:2:3 with points palette notitle\"");
-        remove("data1.txt");
+        system("gnuplot -p -e \"plot 'output/data.txt' using 1:2:3 with points palette notitle\"");
+        remove("data.txt");
     }
 
   } 
     
 
   MPI_Finalize();
-
+  return 0;
 }

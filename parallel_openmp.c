@@ -211,7 +211,7 @@ void draw_chart_gnu(points* poin){
     fclose(fout);
     // outfile.close();
     system("gnuplot -p -e \"plot 'data.txt' using 1:2:3 with points palette notitle\"");
-    // remove("data.txt");
+    remove("data.txt");
 
 }
 
@@ -231,7 +231,7 @@ void draw_chart_gnu(points* poin){
 // }
 
 void openmp_vs_cluster(double dur,int num_cluster){
-    char dir[105]="./output/openmp_vs_cluster.txt";
+    char dir[105]="./output/to_plot/openmp_vs_cluster.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",num_cluster, dur);
 
@@ -239,7 +239,7 @@ void openmp_vs_cluster(double dur,int num_cluster){
 }
 
 void openmp_vs_point(double dur,int size){
-    char dir[105]="./output/openmp_vs_point.txt";
+    char dir[105]="./output/to_plot/openmp_vs_point.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",size, dur);
 
@@ -247,7 +247,7 @@ void openmp_vs_point(double dur,int size){
 }
 
 void openmp_vs_thread(double dur,int numthread){
-    char dir[105]="./output/openmp_vs_thread.txt";
+    char dir[105]="./output/to_plot/openmp_vs_thread.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",numthread, dur);
 
@@ -274,10 +274,10 @@ int main(int argc,char **argv){
         else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
         else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
         else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
-        else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
+        // else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
         else if(MATCH("-d"))  {disable_display = 1;}
         else {
-            printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-s seed] [-p prob] [-t numthreads] [-step] [-g <game #>] [-d]\n",argv[0]);
+            printf("Usage: %s [-n <dataset>] [-i <iterations>] [-t numthreads] [-c num clusters] [-d disable display]\n",argv[0]);
             return(-1);
         }
     }

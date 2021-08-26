@@ -202,7 +202,7 @@ void draw_chart_gnu(points* poin){
 }
 
 void serial_vs_cluster(double dur,int num_cluster){
-    char dir[105]="./output/serial_vs_cluster.txt";
+    char dir[105]="./output/to_plot/serial_vs_cluster.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",num_cluster, dur);
 
@@ -210,7 +210,7 @@ void serial_vs_cluster(double dur,int num_cluster){
 }
 
 void serial_vs_point(double dur,int size){
-    char dir[105]="./output/serial_vs_point.txt";
+    char dir[105]="./output/to_plot/serial_vs_point.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",size, dur);
 
@@ -238,10 +238,10 @@ int main(int argc,char **argv){
         else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
         else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
         else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
-        else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
+        // else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
         else if(MATCH("-d"))  {disable_display = 1;}
         else {
-            printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
+            printf("Usage: %s [-n <dataset>] [-i <iterations>] [-t numthreads] [-c num clusters] [-d disable display]\n",argv[0]);
             return(-1);
         }
     }
@@ -293,7 +293,7 @@ int main(int argc,char **argv){
 
     
     printf("Creating clusters..\n");
-    clusters mycluster = init_clusters(4);
+    clusters mycluster = init_clusters(num_cluster);
     printf("Clusters initialized \n");
 
     double time_point2 = omp_get_wtime();

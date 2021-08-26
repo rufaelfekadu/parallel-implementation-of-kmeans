@@ -262,7 +262,7 @@ void draw_chart_gnu(points* poin){
 
     fclose(fout);
     system("gnuplot -p -e \"plot 'data.txt' using 1:2:3 with points palette notitle\"");
-    // remove("data.txt");
+    remove("data.txt");
 
 }
 
@@ -270,6 +270,30 @@ void result(double dur,int size,int num_cluster){
     char dir[105]="./output/result.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",num_cluster, dur);
+
+    fclose(fout);
+}
+
+// void pthread_vs_cluster(double dur,int num_cluster){
+//     char dir[105]="./output/to_plot/pthread_vs_cluster.txt";
+// 	FILE *fout = fopen(dir, "a");
+// 	fprintf(fout, "%d %f\n",num_cluster, dur);
+
+//     fclose(fout);
+// }
+
+void pthread_vs_point(double dur,int size){
+    char dir[105]="./output/to_plot/pthread_vs_point.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",size, dur);
+
+    fclose(fout);
+}
+
+void pthread_vs_thread(double dur,int numthread){
+    char dir[105]="./output/to_plot/pthread_vs_thread.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",numthread, dur);
 
     fclose(fout);
 }
@@ -295,10 +319,10 @@ int main(int argc,char **argv){
         else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
         else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
         else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
-        else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
+        // else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
         else if(MATCH("-d"))  {disable_display = 1;}
         else {
-            printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-t numthreads] [-s seed] [-p prob] [-d]\n",argv[0]);
+            printf("Usage: %s [-n <dataset>] [-i <iterations>] [-t numthreads] [-c num clusters] [-d disable display]\n",argv[0]);
             return(-1);
         }
     }
@@ -350,7 +374,7 @@ int main(int argc,char **argv){
 
     
     printf("Creating clusters..\n");
-    clusters mycluster = init_clusters(4);
+    clusters mycluster = init_clusters(num_cluster);
     printf("Clusters initialized \n");
 
     double time_point2 = omp_get_wtime();
@@ -403,7 +427,10 @@ int main(int argc,char **argv){
     printf("Number of iterations: %d, total time: %f seconds, time per iteration: %f seconds\n",
         iterations, duration, duration/iterations);
 
-    result(duration/iterations,mypoints.size,num_cluster);
+    // result(duration/iterations,mypoints.size,num_cluster);
+    pthread_vs_point(duration/iteration,mypoints.size);
+    pthread_vs_cluster(duration/iteration,num_cluster);
+    pthread_vs_thread(duration/iteration,numthreads);
 
     if(!disable_display){
 
