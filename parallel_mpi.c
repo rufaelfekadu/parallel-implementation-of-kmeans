@@ -89,8 +89,8 @@ void mpi_vs_point(double dur,int size){
     fclose(fout);
 }
 
-void mpi_vs_thread(double dur,int numthread){
-    char dir[105]="./output/to_plot/mpi_vs_thread.txt";
+void mpi_vs_process(double dur,int numthread){
+    char dir[105]="./output/to_plot/mpi_vs_process.txt";
 	FILE *fout = fopen(dir, "a");
 	fprintf(fout, "%d %f\n",numthread, dur);
 
@@ -108,14 +108,14 @@ int main(int argc, char** argv) {
 
     for(ac=1;ac<argc;ac++)
     {
-        if(MATCH("-n")) {nx = atoi(argv[++ac]);}
+        if(MATCH("-nx")) {nx = atoi(argv[++ac]);}
         else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
         // else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
         else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
         // else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
         else if(MATCH("-d"))  {disable_display = 1;}
         else {
-            printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-s seed] [-p prob] [-t numthreads] [-step] [-g <game #>] [-d]\n",argv[0]);
+            printf("Usage: %s [-nx < dataset>] [-i <max iterations>] [-d disable display]\n",argv[0]);
             return(-1);
         }
     }
@@ -259,19 +259,17 @@ int main(int argc, char** argv) {
       // Root process computes new centroids by dividing sums per cluster
       // by count per cluster.
       for (int i = 0; i<num_cluster; i++) {
-      for (int j = 0; j<2; j++) {
-      int dij = 2*i + j;
-      grand_sums[dij] /= grand_counts[i];
+        for (int j = 0; j<2; j++) {
+        int dij = 2*i + j;
+        grand_sums[dij] /= grand_counts[i];
+        }
       }
-    }
-    // Have the centroids changed much?
-    norm = distance2(grand_sums, centroids, 2*num_cluster);
-    printf("norm: %f\n",norm);
-    // Copy new centroids from grand_sums into centroids.
-    for (int i=0; i<num_cluster*2; i++) {
-      centroids[i] = grand_sums[i];
-    }
-    print_centroids(centroids,num_cluster,2);
+      // Have the centroids changed much?
+      norm = distance2(grand_sums, centroids, 2*num_cluster);
+      // Copy new centroids from grand_sums into centroids.
+      for (int i=0; i<num_cluster*2; i++) {
+        centroids[i] = grand_sums[i];
+      }
     }
     // Broadcast the norm.  All processes will use this in the loop test.
     MPI_Bcast(&norm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -290,12 +288,18 @@ int main(int argc, char** argv) {
   float t2 = MPI_Wtime();
   // Root can print out all sites and labels.
   if ((rank == 0) && 1) {
+
     float time_taken = t2-t1;
     printf("number of iteration: %d\n",itr); 
     printf("time taken per iteration: %f\n",time_taken/itr);
+
+    mpi_vs_cluster(time_taken/itr,num_cluster);
+    mpi_vs_point(time_taken/itr,num_elements);
+    mpi_vs_process(time_taken/itr,nprocs);
+    
     if(!disable_display){
 
-      FILE *fout = fopen("output/data1.txt", "w");
+      FILE *fout = fopen("output/data.txt", "w");
       float* site = all_sites; 
       for (int i = 0; i < nprocs * sites_per_proc; i++, site += 2) {
 
@@ -306,8 +310,8 @@ int main(int argc, char** argv) {
         fprintf(fout, "%4d\n",all_labels[i]);
       }
         fclose(fout);
-        system("gnuplot -p -e \"plot 'output/data1.txt' using 1:2:3 with points palette notitle\"");
-        remove("data1.txt");
+        system("gnuplot -p -e \"plot 'output/data.txt' using 1:2:3 with points palette notitle\"");
+        remove("data.txt");
     }
 
   } 

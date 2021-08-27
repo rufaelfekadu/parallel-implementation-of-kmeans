@@ -15,7 +15,7 @@ mpi_openmp:
 	mpicxx -o output/compiled/mpi_openmp parallel_mpi_with_openmp.c -fopenmp -lm
 
 plot:
-	gcc -o plot plot.c
+	gcc -o output/compiled/plot plot.c
 
 clean:
 	$(RM) output/compiled/*;

@@ -46,8 +46,7 @@ int assign_site(const float* site, float* centroids, const int k, const int d, c
   float best_dist = distance2(site, centroids, d);
   float* centroid = centroids + d;
   int c ;
- 
-    #pragma omp for  schedule(static)
+
     for (c = 1; c < k; c++) {
         
         float dist = distance2(site, centroid, d);
@@ -57,7 +56,7 @@ int assign_site(const float* site, float* centroids, const int k, const int d, c
         }
         centroid += d;
     }
-  
+
   return best_cluster;
 }
 
@@ -105,6 +104,14 @@ void mpi_openmp_vs_thread(double dur,int numthread){
     fclose(fout);
 }
 
+void mpi_openmp_vs_process(double dur,int procs){
+    char dir[105]="./output/to_plot/mpi_openmp_vs_process.txt";
+	FILE *fout = fopen(dir, "a");
+	fprintf(fout, "%d %f\n",procs, dur);
+
+    fclose(fout);
+}
+
 int main(int argc, char** argv) {
 
     srand(31359);
@@ -113,13 +120,13 @@ int main(int argc, char** argv) {
     int seedVal = 100;
     int nx = 1;
     int num_cluster = 4;
-    int num_threads = 1;
+    int numthreads = 1;
 
     for(ac=1;ac<argc;ac++)
     {
         if(MATCH("-n")) {nx = atoi(argv[++ac]);}
         else if(MATCH("-i")) {max_iterations = atoi(argv[++ac]);}
-        else if(MATCH("-t"))  {num_threads = atof(argv[++ac]);}
+        else if(MATCH("-t"))  {numthreads = atof(argv[++ac]);}
         else if(MATCH("-c"))  {num_cluster = atof(argv[++ac]);}
         // else if(MATCH("-s"))  {seedVal = atof(argv[++ac]);}
         else if(MATCH("-d"))  {disable_display = 1;}
@@ -225,7 +232,6 @@ int main(int argc, char** argv) {
       centroids[i] = all_sites[i];
       // centroids[i] = (rand()-RAND_MAX/2) % (int) max_range; 
     }
-    print_centroids(centroids, num_cluster, 2);
 
     grand_sums = (float *)malloc(num_cluster * 2 * sizeof(float));
 
@@ -253,13 +259,15 @@ int main(int argc, char** argv) {
 
     // Find the closest centroid to each site and assign to cluster.
     float* site = sites;
-    for (int i = 0; i < sites_per_proc; i++, site += 2) {
-      int cluster = assign_site(site, centroids, num_cluster, 2,num_threads);
-      // Record the assignment of the site to the cluster.
-      counts[cluster]++;
-      add_site(site, &sums[cluster*2], 2);
-    }
-
+      int i;
+      #pragma omp parallel for num_threads(numthreads) private(i)
+      for ( i = 0; i < sites_per_proc; i++) {
+        int cluster = assign_site(site, centroids, num_cluster, 2,numthreads);
+        // Record the assignment of the site to the cluster.
+        counts[cluster]++;
+        add_site(site, &sums[cluster*2], 2);
+        site += 2;
+      }
     // Gather and sum at root all cluster sums for individual processes.
     MPI_Reduce(sums, grand_sums, num_cluster * 2, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(counts, grand_counts, num_cluster, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -268,19 +276,17 @@ int main(int argc, char** argv) {
       // Root process computes new centroids by dividing sums per cluster
       // by count per cluster.
       for (int i = 0; i<num_cluster; i++) {
-      for (int j = 0; j<2; j++) {
-      int dij = 2*i + j;
-      grand_sums[dij] /= grand_counts[i];
+        for (int j = 0; j<2; j++) {
+        int dij = 2*i + j;
+        grand_sums[dij] /= grand_counts[i];
+        }
       }
-    }
-    // Have the centroids changed much?
-    norm = distance2(grand_sums, centroids, 2*num_cluster);
-    printf("norm: %f\n",norm);
-    // Copy new centroids from grand_sums into centroids.
-    for (int i=0; i<num_cluster*2; i++) {
-      centroids[i] = grand_sums[i];
-    }
-    print_centroids(centroids,num_cluster,2);
+      // Have the centroids changed much?
+      norm = distance2(grand_sums, centroids, 2*num_cluster);
+      // Copy new centroids from grand_sums into centroids.
+      for (int i=0; i<num_cluster*2; i++) {
+        centroids[i] = grand_sums[i];
+      }
     }
     // Broadcast the norm.  All processes will use this in the loop test.
     MPI_Bcast(&norm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -290,7 +296,7 @@ int main(int argc, char** argv) {
   // Now centroids are fixed, so compute a final label for each site.
   float* site = sites;
   for (int i = 0; i < sites_per_proc; i++, site += 2) {
-    labels[i] = assign_site(site, centroids, num_cluster, 2,num_threads);
+    labels[i] = assign_site(site, centroids, num_cluster, 2,numthreads);
   }
 
   // Gather all labels into root process.
@@ -299,13 +305,16 @@ int main(int argc, char** argv) {
   float t2 = MPI_Wtime();
   // Root can print out all sites and labels.
   if ((rank == 0) && 1) {
+
     float time_taken = t2-t1;
     printf("number of iteration: %d\n",itr); 
     printf("time taken per iteration: %f\n",time_taken/itr);
 
-    mpi_openmp_vs_cluster(time_taken,num_cluster);
-    mpi_openmp_vs_point(time_taken,num_elements);
-    mpi_openmp_vs_thread(time_taken,num_threads);
+    // mpi_openmp_vs_cluster(time_taken/itr,num_cluster);
+    // mpi_openmp_vs_point(time_taken/itr,num_elements);
+    mpi_openmp_vs_thread(time_taken/itr,numthreads);
+    // mpi_openmp_vs_process(time_taken/itr,nprocs);
+
     if(!disable_display){
 
       FILE *fout = fopen("output/data.txt", "w");
