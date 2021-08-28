@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
     float *x,*y;
     all_sites = init_points(dataset_filename,sites_per_proc,nprocs);
     // Take the first k sites as the initial cluster centroids.
-    for (int i = 0; i < num_cluster * 2 -1; i++) {
+    for (int i = 0; i < num_cluster * 2 ; i++) {
       centroids[i] = all_sites[i];
       // centroids[i] = (rand()-RAND_MAX/2) % (int) max_range; 
     }
