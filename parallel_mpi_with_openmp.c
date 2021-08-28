@@ -47,15 +47,16 @@ int assign_site(const float* site, float* centroids, const int k, const int d, c
   float* centroid = centroids + d;
   int c ;
 
-    for (c = 1; c < k; c++) {
-        
-        float dist = distance2(site, centroid, d);
-        if (dist < best_dist) {
-            best_cluster = c;
-            best_dist = dist;
+        #pragma omp for schedule(static)
+        for (c= 1; c < k; c++) {
+            
+            float dist = distance2(site, centroid, d);
+            if (dist < best_dist) {
+                best_cluster = c;
+                best_dist = dist;
+            }
+            centroid += d;
         }
-        centroid += d;
-    }
 
   return best_cluster;
 }
@@ -260,13 +261,14 @@ int main(int argc, char** argv) {
     // Find the closest centroid to each site and assign to cluster.
     float* site = sites;
       int i;
-      #pragma omp parallel for num_threads(numthreads) private(i)
-      for ( i = 0; i < sites_per_proc; i++) {
+      for ( i = 0; i < sites_per_proc; i++,site += 2) {
+          // omp_set_dynamic(0);
+          // omp_set_num_threads(numthreads);
         int cluster = assign_site(site, centroids, num_cluster, 2,numthreads);
         // Record the assignment of the site to the cluster.
         counts[cluster]++;
         add_site(site, &sums[cluster*2], 2);
-        site += 2;
+        
       }
     // Gather and sum at root all cluster sums for individual processes.
     MPI_Reduce(sums, grand_sums, num_cluster * 2, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -310,9 +312,9 @@ int main(int argc, char** argv) {
     printf("number of iteration: %d\n",itr); 
     printf("time taken per iteration: %f\n",time_taken/itr);
 
-    // mpi_openmp_vs_cluster(time_taken/itr,num_cluster);
+    mpi_openmp_vs_cluster(time_taken/itr,num_cluster);
     // mpi_openmp_vs_point(time_taken/itr,num_elements);
-    mpi_openmp_vs_thread(time_taken/itr,numthreads);
+    mpi_openmp_vs_thread(time_taken/itr,omp_get_num_threads());
     // mpi_openmp_vs_process(time_taken/itr,nprocs);
 
     if(!disable_display){
